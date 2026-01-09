@@ -1,0 +1,49 @@
+import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
+from itertools import combinations
+import os
+
+# Load CSV
+file_path = os.path.expanduser("~/Desktop/gender_wage_gap.csv")
+df = pd.read_csv(file_path)
+
+# Pick year with most available data
+year_counts = df.groupby('Year')['Gender wage gap %'].count()
+year_with_most_data = year_counts.idxmax()
+df_latest = df[df['Year'] == year_with_most_data].dropna(subset=['Gender wage gap %'])
+
+# Build edges based on similarity
+edges = []
+for (i, row1), (j, row2) in combinations(df_latest.iterrows(), 2):
+    c1 = row1['country']
+    c2 = row2['country']
+    gap1 = row1['Gender wage gap %']
+    gap2 = row2['Gender wage gap %']
+    weight = 1 / (1 + abs(gap1 - gap2))
+    edges.append((c1, c2, round(weight, 4)))
+
+# Save network CSV
+edge_df = pd.DataFrame(edges, columns=['Source','Target','Weight'])
+edge_df.to_csv("gender_pay_gap_network_large.csv", index=False)
+print("Network CSV saved as gender_pay_gap_network_large.csv")
+
+# Create graph
+G = nx.Graph()
+for _, r in edge_df.iterrows():
+    G.add_edge(r['Source'], r['Target'], weight=r['Weight'])
+
+print(nx.info(G))
+
+# Visualize network
+plt.figure(figsize=(15,12))
+pos = nx.spring_layout(G, seed=42)
+nx.draw(G, pos, with_labels=True, node_color='lightpink', node_size=500, arrowsize=20)
+edge_labels = nx.get_edge_attributes(G, 'weight')
+nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
+plt.title(f"Gender Pay Gap Similarity Network ({year_with_most_data})")
+plt.show()
+python3 gender_network.py
+
+
+
